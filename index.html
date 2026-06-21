@@ -1,0 +1,2352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>On Cue — Live Script Prompter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
+  <style>
+    :root {
+      --bg-chrome: #241B2E;
+      --bg-chrome-2: #2F2440;
+      --card-cream: #FBF3E3;
+      --card-edge: #E3D3AE;
+      --ink: #2A1F12;
+      --ink-soft: #5C4E3E;
+      --gold: #D9A441;
+      --gold-deep: #B9842B;
+      --coral: #E2675B;
+      --muted: #A89BC2;
+      --good: #6FA787;
+      --radius-lg: 20px;
+      --radius-md: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 50% -10%, var(--bg-chrome-2), var(--bg-chrome) 60%);
+      color: var(--card-cream);
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 640px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 18px 32px;
+    }
+
+    .wordmark {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 1.4rem;
+      letter-spacing: 0.01em;
+      color: var(--gold);
+    }
+
+    .wordmark small {
+      display: block;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ---------- SCREEN: LANGUAGE SELECT ---------- */
+    .screen {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+    }
+
+    .screen.is-active {
+      display: flex;
+    }
+
+    .select-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 28px;
+      padding-top: 8px;
+    }
+
+    .select-title {
+      font-family: 'Fraunces', serif;
+      font-weight: 700;
+      font-size: clamp(2rem, 7vw, 2.6rem);
+      line-height: 1.1;
+      margin: 0;
+    }
+
+    .select-sub {
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.5;
+      margin: 10px 0 0;
+      max-width: 46ch;
+    }
+
+    .lang-options {
+      display: grid;
+      gap: 14px;
+    }
+
+    .lang-card {
+      appearance: none;
+      border: 1.5px solid rgba(217, 164, 65, 0.35);
+      background: rgba(251, 243, 227, 0.04);
+      color: var(--card-cream);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transition: border-color .15s ease, background .15s ease, transform .15s ease;
+    }
+
+    .lang-card:hover {
+      border-color: var(--gold);
+      background: rgba(217, 164, 65, 0.08);
+    }
+
+    .lang-card:active {
+      transform: scale(0.99);
+    }
+
+    .lang-card:focus-visible {
+      outline: 2px solid var(--gold);
+      outline-offset: 3px;
+    }
+
+    .lang-card .name {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: 1.3rem;
+    }
+
+    .lang-card .name.ar {
+      font-family: 'Noto Naskh Arabic', serif;
+      direction: rtl;
+    }
+
+    .lang-card .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .lang-card .arrow {
+      color: var(--gold);
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
+    .custom-script {
+      margin-top: 30px;
+    }
+
+    .custom-script summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.85rem;
+      list-style: none;
+    }
+
+    .custom-script summary::before {
+      content: "＋ ";
+      color: var(--gold);
+    }
+
+    .custom-script[open] summary::before {
+      content: "－ ";
+    }
+
+    .custom-script summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .custom-script textarea {
+      width: 100%;
+      margin-top: 10px;
+      min-height: 110px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(217, 164, 65, 0.25);
+      border-radius: var(--radius-md);
+      color: var(--card-cream);
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.78rem;
+      padding: 10px;
+      resize: vertical;
+    }
+
+    .custom-script .row {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+      align-items: center;
+    }
+
+    .settings-input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(217, 164, 65, 0.25);
+      border-radius: 8px;
+      color: var(--card-cream);
+      padding: 9px 10px;
+      font-size: 0.8rem;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .settings-input:focus-visible {
+      outline: 2px solid var(--gold);
+      outline-offset: 1px;
+    }
+
+    .btn-small {
+      appearance: none;
+      border: 1px solid var(--gold);
+      background: transparent;
+      color: var(--gold);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-small:hover {
+      background: rgba(217, 164, 65, 0.1);
+    }
+
+    .script-status {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .script-status.ok {
+      color: var(--good);
+    }
+
+    .script-status.err {
+      color: var(--coral);
+    }
+
+    /* ---------- SCREEN: MAIN ---------- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    .pill {
+      appearance: none;
+      border: 1px solid rgba(217, 164, 65, 0.4);
+      background: rgba(251, 243, 227, 0.05);
+      color: var(--card-cream);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill:hover {
+      border-color: var(--gold);
+    }
+
+    .mic-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .mic-btn {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(160deg, var(--gold), var(--gold-deep));
+      color: var(--bg-chrome);
+      font-size: 1.6rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 0 rgba(217, 164, 65, 0.5);
+      transition: box-shadow .2s ease, transform .15s ease;
+    }
+
+    .mic-btn:active {
+      transform: scale(0.96);
+    }
+
+    .mic-btn:focus-visible {
+      outline: 2px solid var(--card-cream);
+      outline-offset: 3px;
+    }
+
+    .mic-btn.listening {
+      animation: pulse 1.6s ease-out infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        box-shadow: 0 0 0 0 rgba(217, 164, 65, 0.55);
+      }
+
+      70% {
+        box-shadow: 0 0 0 18px rgba(217, 164, 65, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(217, 164, 65, 0);
+      }
+    }
+
+    .mic-status {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .mic-status.live {
+      color: var(--coral);
+      font-weight: 600;
+    }
+
+    .cue-card {
+      background: var(--card-cream);
+      color: var(--ink);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--card-edge);
+      padding: 30px 26px;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.55);
+    }
+
+    .cue-card__eyebrow {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold-deep);
+    }
+
+    .cue-card__text {
+      font-family: 'Fraunces', serif;
+      font-weight: 600;
+      font-size: clamp(1.4rem, 5.5vw, 1.9rem);
+      line-height: 1.35;
+      margin: 0;
+    }
+
+    .cue-card__text.ar {
+      font-family: 'Noto Naskh Arabic', serif;
+      font-weight: 500;
+      direction: rtl;
+      text-align: right;
+      line-height: 1.7;
+      font-size: clamp(1.5rem, 6vw, 2.1rem);
+    }
+
+    .cue-card.flash {
+      animation: flash .5s ease;
+    }
+
+    @keyframes flash {
+      0% {
+        transform: translateY(4px);
+        opacity: 0.4;
+      }
+
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 16px 0 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .progress-track {
+      height: 4px;
+      background: rgba(217, 164, 65, 0.18);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 0 0 18px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--gold);
+      border-radius: 4px;
+      transition: width .25s ease;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .icon-btn {
+      flex: 1;
+      appearance: none;
+      border: 1px solid rgba(217, 164, 65, 0.3);
+      background: rgba(251, 243, 227, 0.04);
+      color: var(--card-cream);
+      border-radius: var(--radius-md);
+      padding: 12px 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--gold);
+    }
+
+    .icon-btn:focus-visible {
+      outline: 2px solid var(--gold);
+      outline-offset: 2px;
+    }
+
+    /* ---------- DEBUG PANEL ---------- */
+    .debug-toggle {
+      margin-top: 18px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-decoration: underline;
+      cursor: pointer;
+      align-self: center;
+    }
+
+    .debug-panel {
+      margin-top: 12px;
+      border: 1px dashed rgba(217, 164, 65, 0.3);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-size: 0.8rem;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .debug-panel.open {
+      display: flex;
+    }
+
+    .debug-panel .label {
+      color: var(--gold);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .debug-panel .value {
+      color: var(--card-cream);
+    }
+
+    .debug-panel .muted {
+      color: var(--muted);
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type=range] {
+      flex: 1;
+      accent-color: var(--gold);
+    }
+
+    .unsupported {
+      background: rgba(226, 103, 91, 0.12);
+      border: 1px solid rgba(226, 103, 91, 0.4);
+      color: #F3CFC9;
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      font-size: 0.82rem;
+      margin-bottom: 16px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .mic-btn.listening {
+        animation: none;
+      }
+
+      .cue-card.flash {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- ============ SCREEN 1: LANGUAGE SELECT ============ -->
+    <section class="screen is-active" id="screen-select">
+      <div class="wordmark">On Cue<small>Live script prompter</small></div>
+
+      <div class="select-hero">
+        <div>
+          <h1 class="select-title">Follow tonight's play in your language</h1>
+          <p class="select-sub">On Cue listens to the play in English and shows — and reads aloud — each line as it
+            happens, in the language you choose.</p>
+        </div>
+
+        <div class="lang-options">
+          <button class="lang-card" data-lang="english">
+            <span>
+              <span class="name">English</span>
+              <span class="hint">Show and read lines in English</span>
+            </span>
+            <span class="arrow">→</span>
+          </button>
+          <button class="lang-card" data-lang="arabic">
+            <span>
+              <span class="name ar">العربية</span>
+              <span class="hint">عرض الجمل وقراءتها بالعربية</span>
+            </span>
+            <span class="arrow">→</span>
+          </button>
+        </div>
+
+        <details class="custom-script">
+          <summary>Use my own script JSON</summary>
+          <textarea id="scriptInput"
+            placeholder='[{"speaker":"Narrator","english":"...","arabic":"..."}, ...]'></textarea>
+          <div class="row">
+            <button class="btn-small" id="loadScriptBtn">Load script</button>
+            <span class="script-status" id="scriptStatus">Using sample script (8 lines)</span>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN 2: MAIN PROMPTER ============ -->
+    <section class="screen" id="screen-main">
+      <div class="topbar">
+        <div class="wordmark">On Cue<small>Live script prompter</small></div>
+        <button class="pill" id="langToggle">EN</button>
+      </div>
+
+      <div id="unsupportedNotice" class="unsupported" style="display:none;">
+        This browser doesn't support live listening. Use Prev / Next below to follow manually, and Repeat to hear each
+        line.
+      </div>
+
+      <div class="mic-zone">
+        <button class="mic-btn" id="micBtn" aria-label="Start listening">🎙</button>
+        <div class="mic-status" id="micStatus">Tap to start listening</div>
+      </div>
+
+      <div class="cue-card" id="cueCard">
+        <div class="cue-card__eyebrow" id="cueSpeaker">Speaker</div>
+        <p class="cue-card__text" id="cueText">Tap a language to begin.</p>
+      </div>
+
+      <div class="progress-row">
+        <span id="progressLabel">Line 1 of 1</span>
+        <span id="matchPill" class="muted"></span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+
+      <div class="controls">
+        <button class="icon-btn" id="prevBtn">‹ Prev</button>
+        <button class="icon-btn" id="repeatBtn">↻ Repeat</button>
+        <button class="icon-btn" id="nextBtn">Next ›</button>
+      </div>
+
+      <details class="custom-script" id="voiceSettings" style="margin-top:18px;">
+        <summary>Egyptian Arabic voice (optional)</summary>
+        <p class="select-sub" style="margin:8px 0;font-size:0.82rem;">Browser voices for Arabic are usually flat Modern
+          Standard Arabic. Add a free Azure Speech key for a natural Egyptian voice instead.</p>
+        <div class="row">
+          <input type="text" id="azureKeyInput" class="settings-input" placeholder="Azure Speech key">
+        </div>
+        <div class="row">
+          <input type="text" id="azureRegionInput" class="settings-input" placeholder="Region, e.g. australiaeast">
+        </div>
+        <div class="row">
+          <select id="azureVoiceSelect" class="settings-input">
+            <option value="ar-EG-SalmaNeural">Salma — female, Egyptian</option>
+            <option value="ar-EG-ShakirNeural">Shakir — male, Egyptian</option>
+          </select>
+        </div>
+        <div class="row">
+          <button class="btn-small" id="testVoiceBtn">Test voice</button>
+          <span class="script-status" id="voiceStatus">Using the browser's built-in Arabic voice</span>
+        </div>
+      </details>
+
+      <button class="debug-toggle" id="debugToggle">Show match details</button>
+      <div class="debug-panel" id="debugPanel">
+        <div>
+          <div class="label">What was heard</div>
+          <div class="value" id="debugHeard">—</div>
+        </div>
+        <div>
+          <div class="label">Best match in script</div>
+          <div class="value" id="debugMatch">—</div>
+        </div>
+        <div class="slider-row">
+          <span class="muted">Strict</span>
+          <input type="range" id="thresholdSlider" min="0.2" max="0.8" step="0.05" value="0.35">
+          <span class="muted">Loose</span>
+        </div>
+        <div class="muted" id="thresholdValue">Match sensitivity: 0.35</div>
+        <button class="btn-small" id="resetBtn" style="align-self:flex-start;">Reset to line 1</button>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // ----------------------------------------------------------------
+      // SAMPLE SCRIPT — replace this with your real array, or paste your
+      // JSON into the "Use my own script JSON" box on the language screen.
+      // Shape: { speaker: string, english: string, arabic: string }
+      // ----------------------------------------------------------------
+      const SAMPLE_SCRIPT = [
+        {
+          "speaker": "David young",
+          "english": "(Enters holding his harp, plays and pets the animals while reciting a Psalm) \"The Lord is my shepherd; I shall not want.",
+          "arabic": "(يدخل حاملاً قيثارته، يعزف ويلاعب الحيوانات بينما يتلو مزموراً) \"الرب راعيَّ فلا يعوزني شيء."
+        },
+        {
+          "speaker": "Mother",
+          "english": "What am I going to do? How will I get this all done? There's so much left to do and I'm falling behind!",
+          "arabic": "أعمل إيه؟ إزاي هخلص كل ده؟ لسه فيه كتير وأنا متأخرة!"
+        },
+        {
+          "speaker": "Mother",
+          "english": "The housework is massive, and we've got a very important guest coming today. I'm stuck!",
+          "arabic": "شغل البيت كتير أوي، وعندنا ضيف مهم جداً جاي النهاردة. أنا محتارة!"
+        },
+        {
+          "speaker": "Mother",
+          "english": "Aha! The girls can help me. Zeruiah! Zeruiah!",
+          "arabic": "آه! البنات ممكن يساعدوني. زروية! يا زروية!"
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "Yeah, Mum? What's up?",
+          "arabic": "أيوة يا ماما؟ في إيه؟"
+        },
+        {
+          "speaker": "Mother",
+          "english": "Are you just sitting around playing while I'm doing all this on my own?",
+          "arabic": "قاعدين تلعبوا وسايبني أعمل كل ده لوحدي؟"
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "What's the matter? What do you need? I'm happy to help.",
+          "arabic": "إيه اللي حصل؟ محتاجة إيه؟ أنا مبسوطة إني أساعدك."
+        },
+        {
+          "speaker": "Mother",
+          "english": "Don't you know we have a very important guest coming today?",
+          "arabic": "مش عارفة إن عندنا ضيف مهم جداً جاي النهاردة؟"
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "Who is it, Mum?",
+          "arabic": "مين ده يا ماما؟"
+        },
+        {
+          "speaker": "Mother",
+          "english": "I've told you his story before.",
+          "arabic": "حكيتلك قصته قبل كدة."
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "You tell stories all the time! I don't know which one you mean.",
+          "arabic": "بتحكي قصص طول الوقت! مش عارفة قصدك على مين."
+        },
+        {
+          "speaker": "Mother",
+          "english": "Remember when I told you about the woman who couldn't have kids and was so sad? She prayed and prayed for God to send her a son.",
+          "arabic": "فاكرة لما حكيتلك عن الست اللي ماكانش عندها أطفال وكانت حزينة؟ صلت كتير عشان ربنا يديها ولد."
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "Oh, and then what happened?",
+          "arabic": "أوه، وبعدين إيه اللي حصل؟"
+        },
+        {
+          "speaker": "Mother",
+          "english": "On a feast day, she went to Eli the Priest at the Temple, and he told her, 'May God give you what your heart desires.'",
+          "arabic": "في يوم عيد، راحت لعالي الكاهن في الهيكل، وقالها: 'ربنا يديكي اللي قلبك يتمناه.'"
+        },
+        {
+          "speaker": "Mother",
+          "english": "See, you do remember!",
+          "arabic": "شوفتي؟ طلعتي فاكرة!"
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "I told you I know everything... so who is it then?",
+          "arabic": "قولتلك أنا عارفة كل حاجة... مين ده بقى؟"
+        },
+        {
+          "speaker": "Mother",
+          "english": "We can't just sit here chatting, we've got tasks to finish! Where's your sister?",
+          "arabic": "ما ينفعش نفضل نرغي كده، ورانا شغل لازم يخلص! فين أختك؟"
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "I don't know... probably playing.",
+          "arabic": "مش عارفة... أكيد بتلعب في حتة."
+        },
+        {
+          "speaker": "Mother",
+          "english": "Abigail! Abigail!",
+          "arabic": "أبيجايل! يا أبيجايل!"
+        },
+        {
+          "speaker": "Abigail",
+          "english": "Yeah, Mum? What's going on?",
+          "arabic": "أيوة يا ماما؟ في إيه؟"
+        },
+        {
+          "speaker": "Mother",
+          "english": "Are you playing too and leaving me to do all this solo?",
+          "arabic": "أنتي كمان بتلعبي وسايباني أعمل كل ده لوحدي؟"
+        },
+        {
+          "speaker": "Abigail",
+          "english": "Take it easy, Mum! What do you need? I'm here.",
+          "arabic": "هدي أعصابك يا ماما! محتاجة إيه؟ أنا هنا."
+        },
+        {
+          "speaker": "Mother",
+          "english": "Don't you know an important guest is coming?",
+          "arabic": "مش عارفة إن فيه ضيف مهم جاي؟"
+        },
+        {
+          "speaker": "Abigail",
+          "english": "Who?",
+          "arabic": "مين؟"
+        },
+        {
+          "speaker": "Mother",
+          "english": "I told you the story... about the boy in the Temple when God called him at night. He kept running to the Priest asking, 'Did you call me?'",
+          "arabic": "حكيتلك القصة... عن الولد في الهيكل لما ربنا ناداه بالليل. قعد يجري على الكاهن ويسأله: 'أنت ناديتني؟'"
+        },
+        {
+          "speaker": "Abigail",
+          "english": "Oh! I know that one. On the third time, Eli the Priest told him to say: 'Speak, Lord, for your servant hears.'",
+          "arabic": "أوه! عارفة دي. في تالت مرة، عالي الكاهن قاله يقول: 'تكلم يا رب، لأن عبدك سامع.'"
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "And God talked to him a lot that night.",
+          "arabic": "وربنا اتكلم معاه كتير الليلة دي."
+        },
+        {
+          "speaker": "Mother",
+          "english": "He's the Prophet who anointed Saul as King of Israel. Do you know who he is now?",
+          "arabic": "ده النبي اللي مسح شاول ملك على إسرائيل. عارفة مين هو دلوقتي؟"
+        },
+        {
+          "speaker": "Zeruiah& Abigail",
+          "english": "Samuel the Prophet!",
+          "arabic": "صموئيل النبي!"
+        },
+        {
+          "speaker": "Zeruiah& Abigail",
+          "english": "I said it first!",
+          "arabic": "أنا اللي قولتها الأول!"
+        },
+        {
+          "speaker": "Zeruiah& Abigail",
+          "english": "Dad! Dad's here! Dad, do you know who's coming today?",
+          "arabic": "يا بابا! بابا جه! يا بابا، عارف مين جاي النهاردة؟"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "No time for stories, Samuel the Prophet will be here any minute!",
+          "arabic": "مافيش وقت للقصص، صموئيل النبي هيكون هنا كمان دقيقة!"
+        },
+        {
+          "speaker": "Zeruiah",
+          "english": "But I have to tell the story! You've got to hear it.",
+          "arabic": "بس لازم أحكي القصة! لازم تسمعها."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Not now, girls.",
+          "arabic": "مش دلوقتي يا بنات."
+        },
+        {
+          "speaker": "Zeruiah& Abigail",
+          "english": "You have to listen!",
+          "arabic": "لازم تسمع!"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Samuel the Prophet is at our house! What a great blessing! I can't believe it.",
+          "arabic": "صموئيل النبي في بيتنا! دي بركة كبيرة! مش مصدق!"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Come and say hello to the Prophet, girls. Get a blessing.",
+          "arabic": "تعالوا سلموا على النبي يا بنات، عشان تاخدوا بركة."
+        },
+        {
+          "speaker": "Samuel",
+          "english": "Blessings on this house. The Lord has chosen this home to bring forth a leader for His people.",
+          "arabic": "البركة تحل على البيت ده. الرب اختار البيت ده عشان يخرج منه قائد لشعبه."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Our house? How? It's just a small house.",
+          "arabic": "بيتنا؟ إزاي؟ ده بيت صغير خالص."
+        },
+        {
+          "speaker": "Mother & Girls",
+          "english": "God chose our house? But how?",
+          "arabic": "ربنا اختار بيتنا؟ بس إزاي؟"
+        },
+        {
+          "speaker": "Samuel",
+          "english": "I told the people I've come to offer a sacrifice in Bethlehem, but the Lord commanded me to come here and choose one of your sons to be King.",
+          "arabic": "قولت للناس إني جاي أقدم ذبيحة في بيت لحم، بس الرب أمرني أجي هنا وأختار واحد من ولادك يكون ملك."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "One of my sons? A King?! No way. Eliab... Eliab!",
+          "arabic": "واحد من ولادي؟ ملك؟! مستحيل. يا ألياب... يا ألياب!"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "This is Eliab, the oldest. Say hello to the Prophet.",
+          "arabic": "ده ألياب، الكبير. سلم على النبي."
+        },
+        {
+          "speaker": "Samuel",
+          "english": "(Looking up) \"Surely the Lord's anointed stands here.",
+          "arabic": "(باصص لفوق) \"أكيد ده مسيح الرب اللي واقف هنا."
+        },
+        {
+          "speaker": "Voice Over",
+          "english": "Do not look at his appearance or at his physical stature, because I have refused him. For the Lord does not see as man sees; for man looks at the outward appearance, but the Lord looks at the heart.",
+          "arabic": "ما تبصش لمنظره ولا لطوله، لأني رفضته. لأن الرب لا ينظر كما ينظر الإنسان؛ لأن الإنسان ينظر إلى العينين، أما الرب فينظر إلى القلب."
+        },
+        {
+          "speaker": "Samuel",
+          "english": "The Lord has not chosen Eliab.",
+          "arabic": "الرب ما اختارش ألياب."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Alright, not Eliab then... Abinadab!",
+          "arabic": "طيب، مش ألياب... يبقى أبيناداب!"
+        },
+        {
+          "speaker": "Samuel",
+          "english": "The Lord hasn't chosen him either.",
+          "arabic": "الرب ما اختارش ده كمان."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Shammah!",
+          "arabic": "شمة!"
+        },
+        {
+          "speaker": "Samuel",
+          "english": "Nope, not this one either.",
+          "arabic": "لأ، مش ده كمان."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Come here, the rest of you boys! (The other 4 sons enter)",
+          "arabic": "تعالوا هنا، بقيت الولاد! (الأربعة التانيين بيدخلوا)"
+        },
+        {
+          "speaker": "Samuel",
+          "english": "The Lord hasn't chosen any of these. Are these all your sons?",
+          "arabic": "الرب ما اختارش حد من دول. هما دول كل ولادك؟"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "(Counting them) \"One, two... seven. Yes, all here... wait, do you think we missed anyone?",
+          "arabic": "(بيعدهم) \"واحد، اتنين... سبعة. أيوة، كلهم هنا... استنى، تفتكر نسينا حد؟"
+        },
+        {
+          "speaker": "Mother",
+          "english": "There's still David, my youngest. He's out in the fields.",
+          "arabic": "لسه داوود، أصغرهم. هو في الغيط."
+        },
+        {
+          "speaker": "Mother",
+          "english": "Yes, David, my dear boy. He's the youngest, out with the sheep. Eliab, go grab David and bring him here.",
+          "arabic": "أيوة، داوود، ابني حبيبي. هو الصغير، مع الغنم. يا ألياب، روح هات داوود وجيبه هنا."
+        },
+        {
+          "speaker": "Mother - to audience",
+          "english": "You might think you're forgotten or that no one notices you. People might overlook you, no matter who your family is. But God sees your heart and your love for Him. He remembers you.",
+          "arabic": "يمكن تفتكر إنك منسي أو إن ماحدش شايفك. الناس ممكن يتجاهلوك، مش مهم عيلتك مين. بس ربنا شايف قلبك ومحبتك ليه. هو فاكرك."
+        },
+        {
+          "speaker": "Eliab",
+          "english": "(Enters with David) \"David's here, Dad.",
+          "arabic": "(بيدخل مع داوود) \"داوود جه يا بابا."
+        },
+        {
+          "speaker": "Voice Over",
+          "english": "Rise and anoint him; this is the one.",
+          "arabic": "قوم وامسحه؛ هو ده."
+        },
+        {
+          "speaker": "Guard 1",
+          "english": "Your Majesty, King Saul.",
+          "arabic": "جلالتك، الملك شاول."
+        },
+        {
+          "speaker": "Saul",
+          "english": "What is it? What do you want?",
+          "arabic": "في إيه؟ عايز إيه؟"
+        },
+        {
+          "speaker": "Guard 1",
+          "english": "Samuel the Prophet is at the door.",
+          "arabic": "صموئيل النبي على الباب."
+        },
+        {
+          "speaker": "Saul",
+          "english": "Well, let him in quickly!",
+          "arabic": "طيب، دخله بسرعة!"
+        },
+        {
+          "speaker": "Samuel",
+          "english": "(Enters) \"Saul, what have you done?",
+          "arabic": "(بيدخل) \"يا شاول، إيه اللي عملته ده؟"
+        },
+        {
+          "speaker": "Saul",
+          "english": "I haven't done anything wrong!\" (scared)",
+          "arabic": "أنا ما عملتش حاجة غلط!\" (خايف)"
+        },
+        {
+          "speaker": "Samuel",
+          "english": "Then why can I hear the sound of sheep? Didn't the Lord tell you not to keep anything from the war?",
+          "arabic": "أمال ليه سامع صوت غنم؟ مش الرب قالك ما تاخدش أي حاجة من الحرب؟"
+        },
+        {
+          "speaker": "Saul",
+          "english": "The people took the sheep and kept it for them, it wasn't me!",
+          "arabic": "الناس هما اللي خدوا الغنم وشالوها لنفسهم، مش أنا!"
+        },
+        {
+          "speaker": "Samuel",
+          "english": "Does the Lord care more about sacrifices than He does about obeying His voice?",
+          "arabic": "هو الرب بيهتم بالذبيحة أكتر من طاعته؟"
+        },
+        {
+          "speaker": "Saul",
+          "english": "I'm sorry!\" (Grabs Samuel's robe) \"Please, stay and worship the Lord with me.",
+          "arabic": "أنا آسف!\" (بيمسك توب صموئيل) \"أرجوك، خليك واعبد الرب معايا."
+        },
+        {
+          "speaker": "Samuel",
+          "english": "No. Because you rejected the word of the Lord, He has rejected you as King over Israel.",
+          "arabic": "لأ. لأنك رفضت كلمة الرب، هو رفضك كملك على إسرائيل."
+        },
+        {
+          "speaker": "Samuel",
+          "english": "The Lord has torn the kingdom of Israel from you today and given it to a neighbour of yours who is better than you.",
+          "arabic": "الرب مزق مملكة إسرائيل منك النهاردة وإداها لواحد قريبك أحسن منك."
+        },
+        {
+          "speaker": "Saul",
+          "english": "I am the king, no one could take my kingdom from my hand — even Samuel. I am the king here, I am strong — I am weak — no strong, I am the king.",
+          "arabic": "أنا الملك، ماحدش يقدر ياخد مملكتي من إيدي - حتى صموئيل. أنا الملك هنا، أنا قوي - أنا ضعيف - لأ قوي، أنا الملك."
+        },
+        {
+          "speaker": "Guard 2",
+          "english": "An evil spirit from the Lord troubled him.",
+          "arabic": "روح شرير من الرب كان بيتعب الملك."
+        },
+        {
+          "speaker": "Guard 1",
+          "english": "Your Majesty, let us find someone who is good at playing the harp. When the spirit troubles you, they can play.",
+          "arabic": "جلالتك، خلينا نلاقي حد شاطر في العزف على القيثارة. لما الروح يتعبك، يقدر يعزف."
+        },
+        {
+          "speaker": "Guard 2",
+          "english": "If they play with their hand on the instruments, you'll feel much better.",
+          "arabic": "لو عزفوا بـ إيدهم على الآلات، هتحس إنك أحسن بكتير."
+        },
+        {
+          "speaker": "Saul",
+          "english": "Fine! Get someone here quickly.\" (He starts to be more mad)",
+          "arabic": "طيب! هاتوا حد هنا بسرعة.\" (بيبدأ يتجنن)"
+        },
+        {
+          "speaker": "Guard 2",
+          "english": "David is here, Your Majesty.",
+          "arabic": "داوود هنا، جلالتك."
+        },
+        {
+          "speaker": "Guard 2",
+          "english": "King Saul! The Philistines are on the mountain. They have a giant with them who is terrifying our army!",
+          "arabic": "الملك شاول! الفلسطينيين على الجبل. معاهم عملاق بيخوّف جيشنا!"
+        },
+        {
+          "speaker": "Saul",
+          "english": "Get the army together! Go to the Valley of Elah. I'm on my way!",
+          "arabic": "جمعوا الجيش! روحوا لوادي إيلة. أنا جاي وراكم!"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "David, my son, come here quickly.",
+          "arabic": "يا داوود، يا ابني، تعال هنا بسرعة."
+        },
+        {
+          "speaker": "David",
+          "english": "Yes, father. How can I help you?",
+          "arabic": "أيوة يا بابا. أقدر أساعدك في إيه؟"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Your brothers are with King Saul in the battle against the Philistines.",
+          "arabic": "أخواتك مع الملك شاول في الحرب ضد الفلسطينيين."
+        },
+        {
+          "speaker": "David",
+          "english": "I know, father. I pray that God keeps them safe.",
+          "arabic": "عارف يا بابا. بصلي إن ربنا يحفظهم."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Take this parched grain, these ten loaves of bread, and these cheeses to your brothers and their captain.",
+          "arabic": "خد شوية القمح دول، وعشر أرغفة عيش، والجبنة دي لأخواتك والقائد بتاعهم."
+        },
+        {
+          "speaker": "David",
+          "english": "I will go at once, father. Don't worry. Is there anything else?",
+          "arabic": "هروح فوراً يا بابا. ما تقلقش. فيه أي حاجة تانية؟"
+        },
+        {
+          "speaker": "Jesse",
+          "english": "Yes, my son. Please please, see how your brothers are doing and bring me news from the camp. I am so worried.",
+          "arabic": "أيوة يا ابني. أرجوك، شوف أخواتك عاملين إيه وهاتلي أخبار من المعسكر. أنا قلقان جداً."
+        },
+        {
+          "speaker": "David",
+          "english": "Do not worry, father. I will check on them carefully. I will leave the sheep with a keeper before I go.",
+          "arabic": "ما تقلقش يا بابا. هطمن عليهم كويس. هسيب الغنم مع حد يحرسها قبل ما أمشي."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "The journey is long to the Valley of Elah.",
+          "arabic": "المشوار طويل لوادي إيلة."
+        },
+        {
+          "speaker": "David",
+          "english": "I will rise early in the morning and obey all that you have commanded me.",
+          "arabic": "هصحى بدري الصبح وهعمل كل اللي قولتلي عليه."
+        },
+        {
+          "speaker": "Jesse",
+          "english": "May the Lord go with you, David.",
+          "arabic": "ليكن الرب معك يا داوود."
+        },
+        {
+          "speaker": "Saul",
+          "english": "How is the battle?",
+          "arabic": "إيه أخبار الحرب؟"
+        },
+        {
+          "speaker": "Eliab",
+          "english": "All is well, my lord.",
+          "arabic": "كله تمام يا سيدي."
+        },
+        {
+          "speaker": "Abinadab",
+          "english": "For forty days we have been here.",
+          "arabic": "بقالنا أربعين يوم هنا."
+        },
+        {
+          "speaker": "Saul",
+          "english": "Why haven't you started the war?",
+          "arabic": "ليه ما بدأتوش الحرب؟"
+        },
+        {
+          "speaker": "Shammah",
+          "english": "Because… because… (looks at Eliab) you tell him.",
+          "arabic": "عشان... عشان... (بيبص لألياب) قول له أنت."
+        },
+        {
+          "speaker": "Eliab",
+          "english": "Because there is something here that stopped us from starting the battle.",
+          "arabic": "عشان فيه حاجة هنا منعتنا نبدأ الحرب."
+        },
+        {
+          "speaker": "Saul",
+          "english": "What is it?",
+          "arabic": "إيه هي؟"
+        },
+        {
+          "speaker": "Abinadab",
+          "english": "There is a man… (making a huge sign with his hands) …asking for someone to fight him.",
+          "arabic": "فيه راجل... (بيعمل إشارة كبيرة بإيده) ...بيطلب حد يحاربه."
+        },
+        {
+          "speaker": "Saul",
+          "english": "Anyone from my army can fight him.",
+          "arabic": "أي حد من جيشي يقدر يحاربه."
+        },
+        {
+          "speaker": "Shammah",
+          "english": "No, no… not just anyone. You will see.",
+          "arabic": "لأ، لأ... مش أي حد. هتشوف بنفسك."
+        },
+        {
+          "speaker": "Saul",
+          "english": "Very well. I can wait until I see who he is.",
+          "arabic": "طيب. أقدر أستنى لحد ما أشوف هو مين."
+        },
+        {
+          "speaker": "Eliab",
+          "english": "Why did you come here? You should be at home with the sheep!",
+          "arabic": "إيه اللي جابك هنا؟ كان المفروض تفضل في البيت مع الغنم!"
+        },
+        {
+          "speaker": "David",
+          "english": "Our father Jesse asked me to come to the battlefield and ask about you because you have been away for a long time.",
+          "arabic": "بابا يسّى طلب مني أجي أرض المعركة وأسأل عنكم لأنكم بقالكم كتير بعيد."
+        },
+        {
+          "speaker": "Eliab",
+          "english": "You should not have come here.",
+          "arabic": "ما كانش المفروض تيجي هنا."
+        },
+        {
+          "speaker": "David",
+          "english": "Is this the giant?",
+          "arabic": "هو ده العملاق؟"
+        },
+        {
+          "speaker": "Abinadab",
+          "english": "No, wait.",
+          "arabic": "لأ، استنى."
+        },
+        {
+          "speaker": "Shama",
+          "english": "Wait… wait… he's still coming…",
+          "arabic": "استنى... استنى... لسه جاي..."
+        },
+        {
+          "speaker": "Sword Carrier",
+          "english": "Make way! Make way! The biggest man in the whole world… The undefeated warrior… The giant of giants… Goliaaaathhhh!",
+          "arabic": "وسع! وسع! أكبر راجل في العالم كله... المحارب اللي ما اتهزمش... عملاق العمالقة... جوليآآآآث!"
+        },
+        {
+          "speaker": "Soldier 1",
+          "english": "The giant of giants… Goliaaaathhhh!",
+          "arabic": "عملاق العمالقة... جوليآآآآث!"
+        },
+        {
+          "speaker": "Soldier 2",
+          "english": "The giant of giants… Goliaaaathhhh!",
+          "arabic": "عملاق العمالقة... جوليآآآآث!"
+        },
+        {
+          "speaker": "David",
+          "english": "Is that him?",
+          "arabic": "هو ده؟"
+        },
+        {
+          "speaker": "Shama",
+          "english": "Yes, that's him.",
+          "arabic": "أيوة، هو ده."
+        },
+        {
+          "speaker": "David",
+          "english": "He walks very slowly in all that Armor!",
+          "arabic": "ده ماشي ببطء شديد بكل الدروع دي!"
+        },
+        {
+          "speaker": "Goliath",
+          "english": "Yes, yes, keep cheering. I know I'm amazing.",
+          "arabic": "أيوة، أيوة، كملوا تشجيع. أنا عارف إني فظيع."
+        },
+        {
+          "speaker": "Goliath",
+          "english": "Where is my helmet?!",
+          "arabic": "فين الخوذة بتاعتي؟!"
+        },
+        {
+          "speaker": "Soldier 1",
+          "english": "You always forget your helmet! Here it is.",
+          "arabic": "دايماً بتنسى الخوذة! أهي."
+        },
+        {
+          "speaker": "Soldier 2",
+          "english": "Here is the helmet, mighty Goliath.",
+          "arabic": "أهي الخوذة يا جليات العظيم."
+        },
+        {
+          "speaker": "Goliath",
+          "english": "How do I put it on?",
+          "arabic": "ألبسها إزاي؟"
+        },
+        {
+          "speaker": "Soldier 1",
+          "english": "It's already in front of you!",
+          "arabic": "هي قدامك أصلاً!"
+        },
+        {
+          "speaker": "Soldier 2",
+          "english": "Maybe the helmet is too small… or your head is too big!",
+          "arabic": "يمكن الخوذة صغيرة... أو راسك كبيرة أوي!"
+        },
+        {
+          "speaker": "Soldier 1",
+          "english": "You do it.\" (to Soldier 2)",
+          "arabic": "أنت البسهاله.\" (لجندي ٢)"
+        },
+        {
+          "speaker": "Soldier 2",
+          "english": "No, you do it!",
+          "arabic": "لأ، أنت اللي تعمل كدة!"
+        },
+        {
+          "speaker": "Goliath",
+          "english": "Hurry up!",
+          "arabic": "خلصوا بسرعة!"
+        },
+        {
+          "speaker": "Goliath",
+          "english": "Now I can start my work. I have the helmet on.",
+          "arabic": "دلوقتي أقدر أبدأ شغلي. لبست الخوذة."
+        },
+        {
+          "speaker": "Goliath",
+          "english": "(A massive giant wearing frightening Armor) \"Hey, Israel! Send me one man to fight me. If he defeats me and kills me, we will become your servants. But if I defeat him, you will become ours!",
+          "arabic": "(عملاق ضخم لابس درع مخيف) \"يا إسرائيل! ابعتولي راجل واحد يحاربني. لو غلبني وقتلني، هنبقى خدامين ليكم. بس لو غلبته، أنتوا هتبقوا خدامين لينا!"
+        },
+        {
+          "speaker": "David",
+          "english": "Who is this man insulting the army of the living God? Why is everyone so afraid?",
+          "arabic": "مين الراجل ده اللي بيهين جيش الإله الحي؟ ليه الكل خايف كدة؟"
+        },
+        {
+          "speaker": "Eliab",
+          "english": "What are you doing here? Who is taking care of the sheep while you are here watching the battle? Go home, boy!",
+          "arabic": "بتعمل إيه هنا؟ مين بيراعي الغنم وأنت هنا بتتفرج على الحرب؟ روح بيتك يا واد!"
+        },
+        {
+          "speaker": "David",
+          "english": "What did I do? Can't I even ask a question? What if I kill this Philistine?",
+          "arabic": "أنا عملت إيه؟ ما أقدرش حتى أسأل سؤال؟ إيه رأيك لو قتلت الفلسطيني ده؟"
+        },
+        {
+          "speaker": "Shama",
+          "english": "Kill him? No way. Whoever kills him, the king will reward him with great riches, give him his daughter to marry, and free his father's house from taxes and forced Labor.",
+          "arabic": "تقتله؟ مستحيل. أي حد يقتله، الملك هيكافئه بفلوس كتير، ويجوزه بنته، ويعفي بيت أبوه من الضرايب والسخرة."
+        },
+        {
+          "speaker": "David",
+          "english": "I am going to tell King Saul that I will fight him.",
+          "arabic": "أنا هروح أقول للملك شاول إني هحاربه."
+        },
+        {
+          "speaker": "Soldier 1",
+          "english": "No one will ever think to come here.",
+          "arabic": "محدش هييجي هنا أبداً."
+        },
+        {
+          "speaker": "Soldier 2",
+          "english": "I am afraid he will go to sleep and lose his helmet again.",
+          "arabic": "خايف ينام ويضيع الخوذة تاني."
+        },
+        {
+          "speaker": "David",
+          "english": "King Saul, I want to fight this man. I heard that if someone fights him, you will give him a reward.",
+          "arabic": "يا ملك شاول، أنا عايز أحارب الراجل ده. سمعت إن اللي يحاربه، هتكافئه."
+        },
+        {
+          "speaker": "Saul",
+          "english": "Who are you, and whose son are you?",
+          "arabic": "أنت مين، وابن مين؟"
+        },
+        {
+          "speaker": "David",
+          "english": "I am the son of Jesse, and I want to fight this Philistine.",
+          "arabic": "أنا ابن يسّى، وعايز أحارب الفلسطيني ده."
+        },
+        {
+          "speaker": "Saul",
+          "english": "You are only a boy, and he has been a warrior since his youth. How can you defeat him?",
+          "arabic": "أنت مجرد ولد، وهو محارب من صغره. هتغلبه إزاي؟"
+        },
+        {
+          "speaker": "David",
+          "english": "Your servant used to keep his father's sheep. When a lion or a bear came and carried away a lamb from the flock, I went after it, struck it, and rescued the lamb from its mouth.",
+          "arabic": "خادمك كان بيراعي غنم أبوه. لما أسد أو دب كان بييجي وياخد خروف من القطيع، كنت بجرى وراه، وأضربه، وأنقذ الخروف من بقه."
+        },
+        {
+          "speaker": "David",
+          "english": "When it rose against me, I caught it by its beard, struck it, and killed it. Your servant has killed both lion and bear, and this Philistine will be like one of them because he has defied the armies of the living God.",
+          "arabic": "ولما كان يقوم عليا، كنت بمسكه من دقنه، وأضربه، وأقتله. خادمك قتل الأسد والدب، والفلسطيني ده هيبقى زيهم لأنه أهان جيش الإله الحي."
+        },
+        {
+          "speaker": "Saul",
+          "english": "Alright then. Wear my Armor and take my sword.",
+          "arabic": "خلاص، ماشي. البس درعي وخد سيفي."
+        },
+        {
+          "speaker": "David",
+          "english": "I cannot walk in this Armor, my king. I am not used to it.",
+          "arabic": "ما أقدرش أمشي بالدرع ده يا ملكي. مش متعود عليه."
+        },
+        {
+          "speaker": "Goliath",
+          "english": "(Laughing loudly) \"Am I a dog that you come to me with a stick? Come here, and I will feed your flesh to the birds!",
+          "arabic": "(بيضحك بصوت عالي) \"هو أنا كلب عشان تيجي ليا بعصاية؟ تعال هنا، وهطعم لحمك للطيور!"
+        },
+        {
+          "speaker": "David",
+          "english": "You come against me with a sword, a spear, and a javelin, but I come against you in the name of the Lord of Hosts, the God of the armies of Israel, whom you have defied.",
+          "arabic": "أنت جاي ليا بسيف، ورمح، ومزراق، بس أنا جاي ليك باسم رب الجنود، إله جيوش إسرائيل، اللي أنت أهنته."
+        },
+        {
+          "speaker": "David",
+          "english": "Today, the Lord will deliver you into my hand, and everyone will know that there is a God in Israel!",
+          "arabic": "النهاردة، الرب هيسلمك في إيدي، والكل هيعرف إن فيه إله في إسرائيل!"
+        },
+        {
+          "speaker": "Women 1",
+          "english": "Did you hear what happened?",
+          "arabic": "سمعتوا اللي حصل؟"
+        },
+        {
+          "speaker": "Women 2",
+          "english": "What happened?",
+          "arabic": "إيه اللي حصل؟"
+        },
+        {
+          "speaker": "Women 1",
+          "english": "We won the war against the Philistines!",
+          "arabic": "كسبنا الحرب ضد الفلسطينيين!"
+        },
+        {
+          "speaker": "Women 2",
+          "english": "How? That is impossible!",
+          "arabic": "إزاي؟ ده مستحيل!"
+        },
+        {
+          "speaker": "Women 1",
+          "english": "Do you know Goliath?",
+          "arabic": "عارفة جليات؟"
+        },
+        {
+          "speaker": "Women 2",
+          "english": "Yes, no one can defeat him.",
+          "arabic": "أيوة، ماحدش يقدر يغلبه."
+        },
+        {
+          "speaker": "Women 1",
+          "english": "David defeated him and killed him with his sword!",
+          "arabic": "داوود غلبه وقتله بسيفه!"
+        },
+        {
+          "speaker": "Women 2",
+          "english": "Impossible! No way! Let's call all the girls!",
+          "arabic": "مستحيل! مش معقول! خلونا ننادي على كل البنات!"
+        },
+        {
+          "speaker": "Women 1",
+          "english": "Girls, girls! Come, come!\" (Girls enter) \"David defeated Goliath, and we won the war! Let's sing the song!",
+          "arabic": "يا بنات، يا بنات! تعالوا، تعالوا!\" (البنات بيدخلوا) \"داوود غلب جليات، وكسبنا الحرب! خلونا نغني الأغنية!"
+        },
+        {
+          "speaker": "Women 1",
+          "english": "Saul the king / Has slain his thousands,\",\"الملك شاول / قتل ألوف،\"\"",
+          "arabic": ""
+        },
+        {
+          "speaker": "All the Girls",
+          "english": "Sing and clap together!",
+          "arabic": "غنوا وسقفوا سوا!"
+        },
+        {
+          "speaker": "Women 2",
+          "english": "But David the small, with God's hand, / Has slain ten thousands!",
+          "arabic": "بس داوود الصغير، بإيد الله، / قتل عشرات الألوف!"
+        },
+        {
+          "speaker": "All the Girls",
+          "english": "His mercy is forever!",
+          "arabic": "رحمته للأبد!"
+        },
+        {
+          "speaker": "Women All",
+          "english": "Saul the king / Has slain his thousands, / Sing and clap together! / But David the small, with God's hand, / Has slain ten thousands! / His mercy is forever!",
+          "arabic": "الملك شاول / قتل ألوف، / غنوا وسقفوا سوا! / بس داوود الصغير، بإيد الله، / قتل عشرات الألوف! / رحمته للأبد!"
+        },
+        {
+          "speaker": "Women All",
+          "english": "Goliath was tall, / Big and strong. / He shouted so loud, / All day long. / The soldiers were scared, / They ran away. / But little David, / Came that day, brave and strong.",
+          "arabic": "جليات كان طويل، / كبير وقوي. / صرخ بصوت عالي، / طول النهار. / الجنود خافوا، / وهربوا بعيد. / بس داوود الصغير، / جه اليوم ده، شجاع وقوي."
+        },
+        {
+          "speaker": "Women All",
+          "english": "Part 2 – David's Faith: \"I trust the Lord. / God is stronger, / Than any sword.\" / He took five stones, / And used his sling. / He knew that God / Was with him; he would be a king.",
+          "arabic": "الجزء ٢ - إيمان داوود: \"أنا واثق في الرب. / الله أقوى، / من أي سيف.\" / خد خمس حجارة، / واستخدم مقلاعه. / عرف إن الله / معاه؛ هيبقى ملك."
+        },
+        {
+          "speaker": "Women All",
+          "english": "Part 3 – The Victory: \"The stone flew fast, / Right through the air. / Goliath fell, / Down right there. / The people cheered, / Hip hippeep hooray! / God helps His children, / Every day.",
+          "arabic": "الجزء ٣ - الانتصار: \"الحجر طار بسرعة، / في الهوا. / جليات وقع، / هناك في مكانه. / الناس هتافوا، / هيييييه! / ربنا بيساعد ولاده، / كل يوم."
+        },
+        {
+          "speaker": "Saul",
+          "english": "(Angry and jealous) \"They give David tens of thousands and me only thousands? What's next, the kingdom?",
+          "arabic": "(غضبان وغيران) \"إيدوا لداوود عشرات الألوف وأنا ألوف بس؟ إيه اللي بعد كدة، المملكة؟"
+        },
+        {
+          "speaker": "Saul",
+          "english": "What am I going to do with him? He's a hero, the people love him, he even married my daughter Michal. He's going to take my throne. I have to stop him.",
+          "arabic": "أعمل إيه معاه؟ هو بطل، الناس بتحبه، حتى اتجوز بنتي ميكال. هياخد عرشي. لازم أوقفه."
+        },
+        {
+          "speaker": "Saul",
+          "english": "(Calling out) \"Come here, David, my son. I love you!",
+          "arabic": "(بينادي) \"تعال هنا يا داوود، يا ابني. أنا بحبك!"
+        },
+        {
+          "speaker": "Maid 1",
+          "english": "Sir, some men want to see you.",
+          "arabic": "يا سيدي، فيه رجالة عايزين يشوفوك."
+        },
+        {
+          "speaker": "Nabal",
+          "english": "Can't you see I'm busy having a drink? Ugh, fine, let them in.",
+          "arabic": "مش شايفين إني مشغول بشرب حاجة؟ أف، طيب، دخلوهم."
+        },
+        {
+          "speaker": "Messenger 1",
+          "english": "Peace to you and your house! We were shepherds near your men and never hurt them.",
+          "arabic": "سلام ليك ولبيتك! كنا رعاة جنب رجالتك وما أذيناهمش أبداً."
+        },
+        {
+          "speaker": "Messenger 2",
+          "english": "Your shepherds were with us and we did not hurt them, nor was there anything missing from them all the while they were in Carmel.",
+          "arabic": "رعاتك كانوا معانا وما أذيناهمش، ولا فيه حاجة ناقصة منهم طول ما كانوا في كرمل."
+        },
+        {
+          "speaker": "Messenger 1",
+          "english": "Ask your young men and they will tell you.",
+          "arabic": "اسأل شبابك وهما يقولولك."
+        },
+        {
+          "speaker": "Nabal",
+          "english": "So what do you want then?",
+          "arabic": "عايزين إيه بقى؟"
+        },
+        {
+          "speaker": "Messenger 2",
+          "english": "Therefore, let David the son of Jesse and his servants find favour in your eyes, for we come in a feast day.",
+          "arabic": "عشان كدة، خلي داوود ابن يسّى وخدامه يلاقوا نعمة في عينيك، لأننا جايين في يوم عيد."
+        },
+        {
+          "speaker": "Messenger 1",
+          "english": "Please give your servants and your son David some food.",
+          "arabic": "أرجوك، إدي خدامك وابنك داوود شوية أكل."
+        },
+        {
+          "speaker": "Nabal",
+          "english": "Food? No, No, No. Who is this David guy? Who is this son of Jesse? There are plenty of runaway servants these days. Why should I give my food to people I don't know?",
+          "arabic": "أكل؟ لأ، لأ، لأ. مين داوود ده؟ مين ابن يسّى ده؟ فيه خدامين كتير هربانين الأيام دي. ليه أدّي أكلي لناس ما أعرفهمش؟"
+        },
+        {
+          "speaker": "Nabal",
+          "english": "Shall I then take my bread, water and meat that I have gotten for my servants and give it to people when I don't even know where they are from? Get out! Beat it!",
+          "arabic": "آخد عيشي وميتي ولحمتي اللي جبتهم لخدامي وأديهم لناس ما أعرفش هما منين؟ بره! غورو!"
+        },
+        {
+          "speaker": "Messenger 2",
+          "english": "If David knows these words, he will be very angry.",
+          "arabic": "لو داوود عرف الكلام ده، هيغضب جداً."
+        },
+        {
+          "speaker": "Messenger 1",
+          "english": "You know what, David may come and kill all of you.",
+          "arabic": "عارفين، داوود ممكن ييجي ويقتلكم كلكم."
+        },
+        {
+          "speaker": "Nabal",
+          "english": "What, I don't care. Who is this David guy? Get out! Get out!",
+          "arabic": "إيه، مش مهتم. مين داوود ده؟ بره! بره!"
+        },
+        {
+          "speaker": "Maid 1",
+          "english": "I have to tell my mistress, Abigail.",
+          "arabic": "لازم أقول لسيدتي، أبيجايل."
+        },
+        {
+          "speaker": "Maid 2",
+          "english": "Those men were actually really nice, and the master was so rude to them.",
+          "arabic": "الرجالة دول كانوا كويسين فعلاً، وسيدنا كان قليل الذوق معاهم."
+        },
+        {
+          "speaker": "Maid 3",
+          "english": "David won't be happy about this.",
+          "arabic": "داوود مش هيكون مبسوط من ده."
+        },
+        {
+          "speaker": "Maid 4",
+          "english": "He may come and do as they said.",
+          "arabic": "ممكن ييجي ويعمل زي ما قالوا."
+        },
+        {
+          "speaker": "Abigail",
+          "english": "(Enters) \"What are you all whispering about?",
+          "arabic": "(بتدخل) \"إيه اللي بتوشوشوا فيه ده؟"
+        },
+        {
+          "speaker": "Maid 1",
+          "english": "David sent messengers to Nabal and he kicked them out.",
+          "arabic": "داوود بعت رسل لنبال وهو طردهم."
+        },
+        {
+          "speaker": "Abigail",
+          "english": "Who are these messengers?",
+          "arabic": "مين الرسل دول؟"
+        },
+        {
+          "speaker": "Maid 2",
+          "english": "The men were very good to us, we were not hurt.",
+          "arabic": "الرجالة كانوا كويسين جداً معانا، وما اتأذيناش."
+        },
+        {
+          "speaker": "Maid 3",
+          "english": "Nor did we miss anything as long as we were with them in the field.",
+          "arabic": "ولا فيه حاجة ناقصة مننا طول ما كنا معاهم في الغيط."
+        },
+        {
+          "speaker": "Maid 4",
+          "english": "They were a wall to us both by night and day, all the time we were with them keeping the sheep.",
+          "arabic": "كانوا سور لينا بالليل والنهار، طول الوقت كنا معاهم بنرعى الغنم."
+        },
+        {
+          "speaker": "Maid 1",
+          "english": "Now therefore, know and consider what you will do, for harm is determined against our master and against all of his household.",
+          "arabic": "دلوقتي، اعرفي وفكري هتعملي إيه، لأن فيه أذية متقررة على سيدنا وعلى كل بيته."
+        },
+        {
+          "speaker": "Maid 2",
+          "english": "For he is such a scoundrel that no one can speak to him.",
+          "arabic": "لأنه لئيم وماحدش يقدر يتكلم معاه."
+        },
+        {
+          "speaker": "Abigail - thinking",
+          "english": "Quickly! Pack 200 loaves of bread, some wine, sheep, grains, raisins, and figs. Send them ahead, and I'll follow.",
+          "arabic": "بسرعة! جهزوا ٢٠٠ رغيف عيش، وشوية نبيذ، وغنم، وقمح، وزبيب، وتين. ابعتوهم قدام، وأنا هلحقكم."
+        },
+        {
+          "speaker": "David",
+          "english": "(Enters with his men, angry) \"I'm going to finish that guy! I protected all his stuff and this is how he treats me?",
+          "arabic": "(بيدخل مع رجاله، غضبان) \"أنا هخلص على الراجل ده! حمت كل حاجته وده رده ليا؟"
+        },
+        {
+          "speaker": "All Maids",
+          "english": "This is a present from our mistress Abigail.",
+          "arabic": "دي هدية من سيدتنا أبيجايل."
+        },
+        {
+          "speaker": "Abigail",
+          "english": "(Meets David and bows down, takes the cover of her head) \"On me, my lord, on me let this iniquity be! Please let your maidservant speak in your ears, and hear the words of your maidservant.",
+          "arabic": "(بتقابل داوود وبتسجد، بتشيل غطا راسها) \"عليا أنا يا سيدي، عليا أنا يكون الإثم ده! أرجوك خلي جاريتك تتكلم في ودانك، واسمع كلامها."
+        },
+        {
+          "speaker": "Abigail",
+          "english": "Please, my lord, listen to me. Don't blame yourself for this man. For as his name is, so is he: Nabal is his name, and folly is with him! Don't let blood be on your hands today. Take these gifts for your men.",
+          "arabic": "أرجوك يا سيدي، اسمعني. ما تلومش نفسك على الراجل ده. زي اسمه، هو كدة: نبال هو اسمه، والجهل معاه! ما تخليش دم على إيديك النهاردة. خد الهدايا دي لرجالتك."
+        },
+        {
+          "speaker": "Abigail",
+          "english": "Please forgive the trespass of your maidservant. For the Lord will certainly make for my lord an enduring house, because my lord fights the battles of the Lord, and evil is not found in you throughout your days.",
+          "arabic": "أرجوك سامح غلطة جاريتك. لأن الرب هيعمل لسيدي بيت دايم، لأن سيدي بيحارب حروب الرب، والشر مش موجود فيك طول أيامك."
+        },
+        {
+          "speaker": "Abigail",
+          "english": "That this will be no grief to you, nor offense of heart to my lord. But when the Lord has dealt well with my lord, then remember your maidservant.",
+          "arabic": "إن ده ما يبقاش حزن ليك، ولا عثرة لقلب سيدي. بس لما الرب يعمل خير مع سيدي، افتكر جاريتك."
+        },
+        {
+          "speaker": "David",
+          "english": "Blessed be the Lord God of Israel for sending you to meet me today! Your good sense has kept me from making a huge mistake and seeking revenge.",
+          "arabic": "مبارك الرب إله إسرائيل اللي بعتك تقابليني النهاردة! حِكمتك منعتني أعمل غلطة كبيرة وأنتقم."
+        },
+        {
+          "speaker": "Maid 2",
+          "english": "Wisdom can stop destruction. Abigail used wisdom and calm words to prevent David from taking revenge.",
+          "arabic": "الحكمة تقدر توقف الدمار. أبيجايل استخدمت الحكمة وكلام هادي عشان تمنع داوود ينتقم."
+        },
+        {
+          "speaker": "Maid 3",
+          "english": "Think before acting in anger. David was ready to act in anger, but Abigail helped him make a better decision.",
+          "arabic": "فكر قبل ما تتصرف وأنت غضبان. داوود كان مستعد ينتقم، بس أبيجايل ساعدته ياخد قرار أحسن."
+        },
+        {
+          "speaker": "Maid 4",
+          "english": "God can use anyone to guide others. Abigail became a tool for peace and helped David avoid sin.",
+          "arabic": "ربنا يقدر يستخدم أي حد يوجه التانيين. أبيجايل بقت أداة للسلام وساعدت داوود يتجنب الخطية."
+        },
+        {
+          "speaker": "Maid 1",
+          "english": "A good word can change hearts. Her gentle and wise speech changed David's attitude immediately.",
+          "arabic": "الكلمة الحلوة تقدر تغير القلوب. كلامها الهادي والحكيم غير طريقة داوود فوراً."
+        },
+        {
+          "speaker": "David",
+          "english": "Finally I am the king now. I won all the wars against our enemies. I have been chased from Saul for many years, and finally I am the king.",
+          "arabic": "أخيراً أنا الملك دلوقتي. كسبت كل الحروب ضد أعدائنا. كنت مطارد من شاول سنين كتير، وأخيراً أنا الملك."
+        },
+        {
+          "speaker": "David",
+          "english": "This is the time for me to rest.",
+          "arabic": "ده وقتي عشان أرتاح."
+        },
+        {
+          "speaker": "Satan",
+          "english": "David, you are the king; you are allowed to take any woman as a wife. Here is the woman Bathsheba ",
+          "arabic": "يا داوود، أنت الملك؛ مسموحلك تاخد أي ست كزوجة. أهي الست بثشبع.\""
+        },
+        {
+          "speaker": "David",
+          "english": "Welcome, Nathan the Prophet. You look a bit serious today.",
+          "arabic": "أهلاً يا ناتان النبي. شكلك جدي شوية النهاردة."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "I have a story to tell you, David.",
+          "arabic": "عندي قصة أحكيها لك يا داوود."
+        },
+        {
+          "speaker": "David",
+          "english": "A story? Alright, make it quick.",
+          "arabic": "قصة؟ طيب، خلص بسرعة."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "There were two men. One was rich with flocks of sheep,\" (on the left side all the sheep and the rich man enter) \"the other was poor and had only one little lamb.\" (from the right side the poor man enters with one sheep) \"He loved that lamb like a daughter. It grew up with him, it ate with him and drank from his own cup.",
+          "arabic": "كان فيه راجلين. واحد غني عنده قطعان غنم،\" (على الشمال الغنم والراجل الغني بيدخلوا) \"التاني كان فقير وعنده نعجة واحدة صغيرة.\" (من اليمين الراجل الفقير بيدخل مع نعجة واحدة) \"كان بيحب النعجة دي زي بنته. كبرت معاه، أكلت معاه وشربت من كاسه."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "A guest, a traveller, came to the rich man,\" (the Satan enters from the left) \"but instead of using his own sheep, he stole the poor man's only lamb and cooked it.\" (the Satan takes the sheep from the right to the left)",
+          "arabic": "ضيف، مسافر، جه للراجل الغني،\" (الشيطان بيدخل من الشمال) \"بس بدل ما يستخدم غنمه، سرق نعجة الفقير الوحيدة وطبخها.\" (الشيطان بياخد النعجة من اليمين للشمال)"
+        },
+        {
+          "speaker": "David",
+          "english": "(Furious) \"As the Lord lives, that man deserves to die! He must pay back four times what he took!",
+          "arabic": "(غضبان) \"حي هو الرب، الراجل ده يستحق الموت! لازم يدفع أربعة أضعاف اللي سرقه!"
+        },
+        {
+          "speaker": "Nathan",
+          "english": "You are that man! You had everything, yet you took what wasn't yours.",
+          "arabic": "أنت هو الراجل ده! كان عندك كل حاجة، ومع كدة أخدت اللي مش بتاعك."
+        },
+        {
+          "speaker": "David",
+          "english": "No, not me — how? Impossible! I never did this at all, not me.",
+          "arabic": "لأ، مش أنا - إزاي؟ مستحيل! أنا ما عملتش كدة خالص، مش أنا."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "I will tell you the real story. The Lord God of Israel said: I anointed you king over Israel.\" (young David enters) \"Why have you done evil in His sight? You had Uriah the Hittite killed by the sword.",
+          "arabic": "هحكيلك القصة الحقيقية. الرب إله إسرائيل قال: أنا مسحتك ملك على إسرائيل.\" (داوود الشاب بيدخل) \"ليه عملت الشر في عينيه؟ خليت أوريا الحثي يتقتل بالسيف."
+        },
+        {
+          "speaker": "David",
+          "english": "Yes, I sent a message to the chief of soldiers with him to have him killed.\" (on the left side the rich man gives a message to a soldier to kill Uriah)",
+          "arabic": "أيوة، بعت رسالة لقائد الجيش معاه عشان يقتلوه.\" (على الشمال الراجل الغني بيدي رسالة لجندي عشان يقتل أوريا)"
+        },
+        {
+          "speaker": "Nathan",
+          "english": "And you took his wife to be your wife.",
+          "arabic": "وأنت أخدت مراته عشان تبقى مراتك."
+        },
+        {
+          "speaker": "David",
+          "english": "Yes, I took Bathsheba, his wife, to be my wife.",
+          "arabic": "أيوة، أخدت بثشبع، مراته، عشان تبقى مراتي."
+        },
+        {
+          "speaker": "David",
+          "english": "Have mercy upon me, O God, according to Your great mercy. My sin is before me at all times.\" (looking at Uriah who is dead)",
+          "arabic": "ارحمني يا الله، حسب رحمتك العظيمة. خطيتي قدامي كل وقت.\" (بيبص على أوريا الميت)"
+        },
+        {
+          "speaker": "Satan",
+          "english": "You have blood on your hands you kill Uriah , you took his wife.",
+          "arabic": "إيديك عليها دم، قتلت أوريا، وأخدت مراته."
+        },
+        {
+          "speaker": "David",
+          "english": "Against You O God only have I sinned",
+          "arabic": "إليك وحدك يا الله أخطأت"
+        },
+        {
+          "speaker": "Nathan",
+          "english": "God will accept your repentance if you repent",
+          "arabic": "الله هيقبل توبتك لو تبت"
+        },
+        {
+          "speaker": "David",
+          "english": "and done evil",
+          "arabic": "وعملت الشر"
+        },
+        {
+          "speaker": "Satan",
+          "english": "All your time dewing evil , you remember Nabal how you attempted to kill him , Bathshabaa you have taken as a wife , Uriah you have killed",
+          "arabic": "طول وقتك بتعمل الشر، فاكر نبال لما حاولت تقتله، بثشبع أخدتها كزوجة، أوريا قتلته"
+        },
+        {
+          "speaker": "David",
+          "english": "and done evil before You.",
+          "arabic": "وعملت الشر قدامك."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "you have sinned before God himself and he could help you repent and over come your sins",
+          "arabic": "أنت أخطأت قدام الله نفسه وهو يقدر يساعدك تتوب وتتغلب على خطاياك"
+        },
+        {
+          "speaker": "David",
+          "english": "I was connived in iniquities and in sins My mother, my mother conceived me",
+          "arabic": "كنت مأخوذ في الإثم وفي الخطايا، أمي، أمي حملتني"
+        },
+        {
+          "speaker": "Mother",
+          "english": "You shall sprinkle me with hyssop and I shall be purified.\" (she gives him the harp again)",
+          "arabic": "تنضحني بالزوفا فأطهر.\" (بيديله القيثارة تاني)"
+        },
+        {
+          "speaker": "Nathan",
+          "english": "Behold God loves the truth",
+          "arabic": "هوذا الله يحب الحق"
+        },
+        {
+          "speaker": "Mother",
+          "english": "You shall wash me and I shall be made whiter.",
+          "arabic": "تغسلني فأبيض."
+        },
+        {
+          "speaker": "Satan",
+          "english": "Hi loves the truth, and all what you have done has nothing to do with truth , liar ,  sinner , killer",
+          "arabic": "هو بيحب الحق، وكل اللي عملته ما لوش دعوة بالحق، كداب، خاطي، قاتل"
+        },
+        {
+          "speaker": "David",
+          "english": "Turn away Your face from my sins and blot out all my iniquities.",
+          "arabic": "وجهك عن خطاياي وامحُ كل آثامي."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "God can blot out all your iniquities. \"just repent",
+          "arabic": "الله يقدر يمحو كل آثامك. \"بس توب"
+        },
+        {
+          "speaker": "David",
+          "english": "you shall make me to hear gladness and joy, the humbled bones",
+          "arabic": "تسمعني سروراً وفرحاً، فتبتهج العظام"
+        },
+        {
+          "speaker": "Satan",
+          "english": "humbled , ha-ha ha , where is the humbled in this sin , no humbleness with the sin",
+          "arabic": "متواضع، ها ها ها، فين التواضع في الخطية دي، مافيش تواضع مع الخطية"
+        },
+        {
+          "speaker": "David",
+          "english": "Create in me a clean heart.",
+          "arabic": "قلباً نقياً أخلق فيّ."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "God the creator he could create in you a clean heart",
+          "arabic": "الله الخالق يقدر يخلق فيك قلب نقي"
+        },
+        {
+          "speaker": "David",
+          "english": "Do not cast away from your face",
+          "arabic": "لا تطرحني من قدام وجهك"
+        },
+        {
+          "speaker": "Satan",
+          "english": "look at your sin , how is the anointed from God ,do this",
+          "arabic": "بص على خطيتك، إزاي مسيح الله، يعمل كدة"
+        },
+        {
+          "speaker": "David",
+          "english": "Do not remove Your holy Spirit from me",
+          "arabic": "روحك القدوس لا تنزعه مني"
+        },
+        {
+          "speaker": "Satan",
+          "english": "What about the blood in your hand",
+          "arabic": "إيه رأيك في الدم اللي على إيدك"
+        },
+        {
+          "speaker": "David",
+          "english": "Deliver me from Blood O God",
+          "arabic": "نجني من الدم يا الله"
+        },
+        {
+          "speaker": "Nathan",
+          "english": "Why, my soul, are you downcast? Why so disturbed within me? Put your hope in God, for I will yet praise him, my Savior The God is your salvation",
+          "arabic": "ليه أنتِ منحنية يا نفسي؟ ليه مضطربة فيّ؟ ارجي الله، لأني لسه هسبحه، مخلصي الله هو خلاصك"
+        },
+        {
+          "speaker": "Mother",
+          "english": "Give me the joy of Your salvation, my tongue shall rejoice in Your righteousness.",
+          "arabic": "رد لي بهجة خلاصك، لساني هيهتف ببرك."
+        },
+        {
+          "speaker": "Nathan",
+          "english": "The Lord has taken away your sin; you shall not die.",
+          "arabic": "الرب نزع خطيتك؛ أنت مش هتموت."
+        },
+        {
+          "speaker": "Mother",
+          "english": "A broken and humbled heart God shall not despise.",
+          "arabic": "قلب منكسر ومتواضع الله مش هيحتقره."
+        },
+        {
+          "speaker": "David",
+          "english": "A broken and humbled heart God shall not despise.",
+          "arabic": "قلب منكسر ومتواضع الله مش هيحتقره."
+        },
+        {
+          "speaker": "David",
+          "english": "A broken and humbled heart God shall not despise.",
+          "arabic": "قلب منكسر ومتواضع الله مش هيحتقره."
+        }
+      ];
+
+      // How far around the current line to search when matching what was
+      // heard. Keeping this small is what makes matching reliable even
+      // when a kid's line comes out garbled — we're choosing between a
+      // handful of plausible next lines, not the whole script.
+      const WINDOW_BACK = 1;
+      const WINDOW_FORWARD = 6;
+
+      // Don't even attempt a match on a fragment this short — "I will" can
+      // fuzzy-match several lines at once. This is the main fix for jumping
+      // too early on interim (still-being-spoken) results.
+      const MIN_WORDS_INTERIM = 4;
+
+      // For interim (unconfirmed) results, the best match must beat the
+      // second-best by this much before we commit to a jump. Final results
+      // skip this check since they're already the recognizer's settled guess.
+      const CONFIDENT_MARGIN = 0.12;
+
+      // After a jump, ignore interim-based matching for a moment so a
+      // half-heard next phrase can't immediately bump it again.
+      const JUMP_COOLDOWN_MS = 500;
+
+      const state = {
+        scriptData: SAMPLE_SCRIPT,
+        displayLang: null,        // 'english' | 'arabic'
+        currentIndex: 0,
+        lastSpokenIndex: -1,
+        listening: false,
+        matchThreshold: 0.35,
+        lastJumpAt: 0,
+        recognition: null,
+        voices: [],
+        azureKey: '',
+        azureRegion: '',
+        azureVoice: 'ar-EG-SalmaNeural',
+        currentAudio: null      // tracks an in-flight Azure <audio> so it can be stopped
+      };
+
+      // ---------- DOM ----------
+      const screenSelect = document.getElementById('screen-select');
+      const screenMain = document.getElementById('screen-main');
+      const scriptInput = document.getElementById('scriptInput');
+      const loadScriptBtn = document.getElementById('loadScriptBtn');
+      const scriptStatus = document.getElementById('scriptStatus');
+
+      const langToggle = document.getElementById('langToggle');
+      const micBtn = document.getElementById('micBtn');
+      const micStatus = document.getElementById('micStatus');
+      const unsupportedNotice = document.getElementById('unsupportedNotice');
+
+      const cueCard = document.getElementById('cueCard');
+      const cueSpeaker = document.getElementById('cueSpeaker');
+      const cueText = document.getElementById('cueText');
+      const progressLabel = document.getElementById('progressLabel');
+      const progressFill = document.getElementById('progressFill');
+      const matchPill = document.getElementById('matchPill');
+
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const repeatBtn = document.getElementById('repeatBtn');
+
+      const debugToggle = document.getElementById('debugToggle');
+      const debugPanel = document.getElementById('debugPanel');
+      const debugHeard = document.getElementById('debugHeard');
+      const debugMatch = document.getElementById('debugMatch');
+      const thresholdSlider = document.getElementById('thresholdSlider');
+      const thresholdValue = document.getElementById('thresholdValue');
+      const resetBtn = document.getElementById('resetBtn');
+
+      const azureKeyInput = document.getElementById('azureKeyInput');
+      const azureRegionInput = document.getElementById('azureRegionInput');
+      const azureVoiceSelect = document.getElementById('azureVoiceSelect');
+      const testVoiceBtn = document.getElementById('testVoiceBtn');
+      const voiceStatus = document.getElementById('voiceStatus');
+
+      // ---------- Language select screen ----------
+      document.querySelectorAll('.lang-card').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.displayLang = btn.dataset.lang;
+          enterMainScreen();
+        });
+      });
+
+      loadScriptBtn.addEventListener('click', () => {
+        const raw = scriptInput.value.trim();
+        if (!raw) {
+          scriptStatus.textContent = 'Paste your script JSON above first.';
+          scriptStatus.className = 'script-status err';
+          return;
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed) || !parsed.length || !('english' in parsed[0])) {
+            throw new Error('shape');
+          }
+          state.scriptData = parsed;
+          state.currentIndex = 0;
+          state.lastSpokenIndex = -1;
+          scriptStatus.textContent = 'Loaded ' + parsed.length + ' lines ✓';
+          scriptStatus.className = 'script-status ok';
+        } catch (e) {
+          scriptStatus.textContent = "Couldn't read that JSON — check it's an array of {speaker, english, arabic}.";
+          scriptStatus.className = 'script-status err';
+        }
+      });
+
+      function enterMainScreen() {
+        screenSelect.classList.remove('is-active');
+        screenMain.classList.add('is-active');
+        langToggle.textContent = state.displayLang === 'arabic' ? 'AR' : 'EN';
+        renderCard(false);
+      }
+
+      langToggle.addEventListener('click', () => {
+        state.displayLang = state.displayLang === 'arabic' ? 'english' : 'arabic';
+        langToggle.textContent = state.displayLang === 'arabic' ? 'AR' : 'EN';
+        renderCard(false);
+        speakCurrent();
+      });
+
+      // ---------- Rendering ----------
+      function renderCard(flash) {
+        const item = state.scriptData[state.currentIndex];
+        if (!item) return;
+        cueSpeaker.textContent = item.speaker || '';
+        const isAr = state.displayLang === 'arabic';
+        cueText.textContent = isAr ? (item.arabic || '') : (item.english || '');
+        cueText.classList.toggle('ar', isAr);
+
+        progressLabel.textContent = 'Line ' + (state.currentIndex + 1) + ' of ' + state.scriptData.length;
+        progressFill.style.width = (((state.currentIndex + 1) / state.scriptData.length) * 100) + '%';
+
+        if (flash) {
+          cueCard.classList.remove('flash');
+          void cueCard.offsetWidth; // restart animation
+          cueCard.classList.add('flash');
+        }
+      }
+
+      // ---------- Manual navigation ----------
+      prevBtn.addEventListener('click', () => { goTo(state.currentIndex - 1, true); });
+      nextBtn.addEventListener('click', () => { goTo(state.currentIndex + 1, true); });
+      repeatBtn.addEventListener('click', () => { speakCurrent(); });
+      resetBtn.addEventListener('click', () => { goTo(0, true); });
+
+      function goTo(idx, forceSpeak) {
+        idx = Math.max(0, Math.min(state.scriptData.length - 1, idx));
+        state.currentIndex = idx;
+        renderCard(true);
+        if (forceSpeak) {
+          speakCurrent();
+          state.lastSpokenIndex = idx;
+        }
+      }
+
+      // ---------- Matching ----------
+
+      // Strip punctuation/case noise and fold a few AU/US spelling variants
+      // so "mum" and "mom" (etc.) line up. Extend this list as you find more.
+      const SPELLING_VARIANTS = [[/\bmum\b/g, 'mom']];
+      function normalize(text) {
+        let t = text.toLowerCase().replace(/[.,!?;:"“”'’]/g, '').replace(/\s+/g, ' ').trim();
+        SPELLING_VARIANTS.forEach(([pattern, replacement]) => { t = t.replace(pattern, replacement); });
+        return t;
+      }
+
+      // Filler/structure words we ignore when comparing word-overlap — they're
+      // shared by almost every line, so they're useless for telling lines apart.
+      const STOPWORDS = new Set(['the', 'a', 'an', 'to', 'of', 'and', 'in', 'on', 'is', 'it', 'its', "it's",
+        'that', 'this', 'i', 'you', 'your', 'my', 'me', 'we', 'us', 'he', 'she', 'they', 'them', 'was', 'were',
+        'be', 'been', 'for', 'with', 'at', 'as', 'by', 'or', 'but', 'so', 'if', 'do', 'did', 'does', 'have', 'has',
+        'had', 'will', 'would', 'can', 'could', 'should', 'going', 'get', 'got', 'up', 'out', 'about', 'what',
+        'whats', "what's", 'yeah', 'okay', 'ok', 'um', 'uh', 'like']);
+
+      function significantWords(text) {
+        return normalize(text).split(' ').filter(w => w.length >= 3 && !STOPWORDS.has(w));
+      }
+
+      // 1 = no overlap at all, 0 = every significant word shared.
+      function keywordOverlapScore(heardWords, candidateWords) {
+        if (!heardWords.length || !candidateWords.length) return 1;
+        const candSet = new Set(candidateWords);
+        const shared = heardWords.filter(w => candSet.has(w));
+        if (!shared.length) return 1;
+        const union = new Set([...heardWords, ...candidateWords]).size;
+        return 1 - (shared.length / union);
+      }
+
+      function searchWindow(items, text, thresholdOverride) {
+        const indexed = items.map(it => ({ ...it, _norm: normalize(it.english) }));
+        const fuse = new Fuse(indexed, {
+          keys: ['_norm'],
+          includeScore: true,
+          ignoreLocation: true,
+          threshold: thresholdOverride ?? state.matchThreshold
+        });
+        return fuse.search(normalize(text));
+      }
+
+      // Ranks window candidates by whichever evidence is stronger: character-
+      // level fuzziness (catches typos/mis-hearings of the same words) OR
+      // shared distinctive keywords (catches paraphrasing — different words,
+      // same gist, like "yeah mom what's up" vs "your mum what's going on").
+      function rankCandidates(items, text) {
+        const fuseResults = searchWindow(items, text);
+        const heardWords = significantWords(text);
+        return items.map(item => {
+          const hit = fuseResults.find(r => r.item._idx === item._idx);
+          const fuseScore = hit ? hit.score : 1;
+          const overlapScore = keywordOverlapScore(heardWords, significantWords(item.english));
+          return { item, score: Math.min(fuseScore, overlapScore) };
+        }).sort((a, b) => a.score - b.score);
+      }
+
+      // confident = true for finalized speech (recognizer's settled guess).
+      // confident = false for interim speech still being spoken — these need
+      // a clear winner (margin check) before we trust them enough to jump.
+      function attemptMatch(text, confident) {
+        if (!state.scriptData.length || typeof Fuse === 'undefined') return;
+
+        const start = Math.max(0, state.currentIndex - WINDOW_BACK);
+        const end = Math.min(state.scriptData.length, state.currentIndex + WINDOW_FORWARD + 1);
+        const windowed = state.scriptData.slice(start, end).map((item, i) => ({ ...item, _idx: start + i }));
+        const ranked = rankCandidates(windowed, text);
+
+        if (ranked.length) {
+          const top = ranked[0];
+          const second = ranked[1];
+          const margin = second ? (second.score - top.score) : 1;
+          const passesThreshold = top.score <= state.matchThreshold;
+          const passesConfidence = confident || margin >= CONFIDENT_MARGIN;
+
+          if (passesThreshold && passesConfidence) {
+            debugMatch.textContent = top.item.english + '  (score ' + top.score.toFixed(2) + ')';
+            commitJump(top.item._idx, confident);
+            return;
+          }
+          debugMatch.textContent = passesThreshold
+            ? 'Too close to call yet — waiting for more words…'
+            : 'No line in range matched closely enough.';
+        } else {
+          debugMatch.textContent = 'No line in range matched closely enough.';
+        }
+
+        // Recovery: a finalized phrase found nothing good nearby — the
+        // play may have skipped ahead of where we think we are. Widen the
+        // search to the rest of the script (never backwards beyond the
+        // normal window) with a stricter threshold so we don't mis-jump.
+        // Kept to character-fuzzy only (no keyword-overlap) since a single
+        // shared word is too weak a signal across a wide range of lines.
+        if (confident) widenSearch(text);
+      }
+
+      function widenSearch(text) {
+        const start = Math.max(0, state.currentIndex - WINDOW_BACK);
+        const rest = state.scriptData.slice(start).map((item, i) => ({ ...item, _idx: start + i }));
+        const results = searchWindow(rest, text, Math.min(state.matchThreshold, 0.3));
+        if (results.length) {
+          debugMatch.textContent = '(re-synced) ' + results[0].item.english + '  (score ' + results[0].score.toFixed(2) + ')';
+          commitJump(results[0].item._idx, true);
+        }
+      }
+
+      function commitJump(idx, confident) {
+        if (!confident && Date.now() - state.lastJumpAt < JUMP_COOLDOWN_MS) return;
+        state.lastJumpAt = Date.now();
+        goTo(idx, idx !== state.lastSpokenIndex);
+      }
+
+      // ---------- Text-to-speech ----------
+      function refreshVoices() { state.voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
+      if ('speechSynthesis' in window) {
+        refreshVoices();
+        speechSynthesis.onvoiceschanged = refreshVoices;
+      }
+
+      function pickVoice(lang) {
+        const prefix = lang.split('-')[0];
+        return state.voices.find(v => v.lang === lang)
+          || state.voices.find(v => v.lang && v.lang.startsWith(prefix))
+          || null;
+      }
+
+      function stopAnyAudio() {
+        if (state.currentAudio) {
+          state.currentAudio.pause();
+          state.currentAudio = null;
+        }
+        if ('speechSynthesis' in window) speechSynthesis.cancel();
+      }
+
+      function escapeXml(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+      }
+
+      // Calls Azure's neural TTS REST endpoint directly from the browser —
+      // no backend needed, just a key. The key is only ever held in memory
+      // (state), never written to storage, so it clears on refresh.
+      async function speakViaAzure(text, voiceName, key, region) {
+        const ssml = '<speak version="1.0" xml:lang="ar-EG">'
+          + '<voice xml:lang="ar-EG" name="' + voiceName + '">' + escapeXml(text) + '</voice></speak>';
+
+        const resp = await fetch('https://' + region + '.tts.speech.microsoft.com/cognitiveservices/v1', {
+          method: 'POST',
+          headers: {
+            'Ocp-Apim-Subscription-Key': key,
+            'Content-Type': 'application/ssml+xml',
+            'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3'
+          },
+          body: ssml
+        });
+        if (!resp.ok) throw new Error('Azure TTS request failed: ' + resp.status);
+
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        state.currentAudio = audio;
+        audio.addEventListener('ended', () => { URL.revokeObjectURL(url); if (state.currentAudio === audio) state.currentAudio = null; });
+        await audio.play();
+      }
+
+      function speakNative(text, lang) {
+        if (!('speechSynthesis' in window)) return;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = lang;
+        const voice = pickVoice(lang);
+        if (voice) utter.voice = voice;
+        speechSynthesis.speak(utter);
+      }
+
+      function speakCurrent() {
+        const item = state.scriptData[state.currentIndex];
+        if (!item) return;
+        const isAr = state.displayLang === 'arabic';
+        const text = isAr ? item.arabic : item.english;
+        if (!text) return;
+
+        stopAnyAudio();
+
+        const useAzure = isAr && state.azureKey && state.azureRegion;
+        if (useAzure) {
+          speakViaAzure(text, state.azureVoice, state.azureKey, state.azureRegion).catch(err => {
+            console.warn('Azure TTS failed, falling back to browser voice:', err);
+            voiceStatus.textContent = "Azure voice failed — using the browser's voice instead";
+            voiceStatus.className = 'script-status err';
+            speakNative(text, 'ar-SA');
+          });
+        } else {
+          speakNative(text, isAr ? 'ar-SA' : 'en-US');
+        }
+      }
+
+      // ---------- Arabic voice settings ----------
+      azureKeyInput.addEventListener('input', () => { state.azureKey = azureKeyInput.value.trim(); });
+      azureRegionInput.addEventListener('input', () => { state.azureRegion = azureRegionInput.value.trim(); });
+      azureVoiceSelect.addEventListener('change', () => { state.azureVoice = azureVoiceSelect.value; });
+
+      testVoiceBtn.addEventListener('click', () => {
+        const sample = 'أهلاً، إزيك؟ ده صوت تجريبي.'; // "Hi, how are you? This is a test voice."
+        if (state.azureKey && state.azureRegion) {
+          voiceStatus.textContent = 'Calling Azure…';
+          voiceStatus.className = 'script-status';
+          speakViaAzure(sample, state.azureVoice, state.azureKey, state.azureRegion).then(() => {
+            voiceStatus.textContent = 'Using Azure neural voice (' + state.azureVoice.split('-')[2].replace('Neural', '') + ') ✓';
+            voiceStatus.className = 'script-status ok';
+          }).catch(err => {
+            console.warn(err);
+            voiceStatus.textContent = "Couldn't reach Azure — check the key and region.";
+            voiceStatus.className = 'script-status err';
+          });
+        } else {
+          voiceStatus.textContent = 'Add a key and region above first.';
+          voiceStatus.className = 'script-status err';
+          speakNative(sample, 'ar-SA');
+        }
+      });
+
+      // ---------- Speech recognition (listening) ----------
+      const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognitionCtor) {
+        unsupportedNotice.style.display = 'block';
+        micBtn.disabled = true;
+        micBtn.style.opacity = '0.4';
+        micStatus.textContent = 'Live listening not available in this browser';
+      } else {
+        const recognition = new SpeechRecognitionCtor();
+        recognition.lang = 'en-AU'; // matches Australian accents better than en-US
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        state.recognition = recognition;
+
+        recognition.onresult = (e) => {
+          let finalChunk = '';
+          let interimChunk = '';
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const res = e.results[i];
+            const t = res[0].transcript.trim();
+            if (res.isFinal) finalChunk += (finalChunk ? ' ' : '') + t;
+            else interimChunk += (interimChunk ? ' ' : '') + t;
+          }
+
+          if (finalChunk) {
+            debugHeard.textContent = finalChunk;
+            attemptMatch(finalChunk, true);
+          } else if (interimChunk) {
+            debugHeard.textContent = interimChunk + ' …';
+            const wordCount = interimChunk.split(/\s+/).filter(Boolean).length;
+            if (wordCount >= MIN_WORDS_INTERIM) {
+              attemptMatch(interimChunk, false);
+            }
+          }
+        };
+
+        recognition.onerror = (e) => {
+          if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+            micStatus.textContent = 'Microphone access denied — use Prev / Next instead';
+            state.listening = false;
+            micBtn.classList.remove('listening');
+          }
+        };
+
+        recognition.onend = () => {
+          // Browsers stop recognition after a pause — restart automatically
+          // unless the person explicitly tapped stop.
+          if (state.listening) {
+            try { recognition.start(); } catch (e) { }
+          }
+        };
+
+        micBtn.addEventListener('click', () => {
+          state.listening = !state.listening;
+          if (state.listening) {
+            try { recognition.start(); } catch (e) { }
+            micBtn.classList.add('listening');
+            micStatus.textContent = 'Listening…';
+            micStatus.classList.add('live');
+          } else {
+            recognition.stop();
+            micBtn.classList.remove('listening');
+            micStatus.textContent = 'Paused — tap to resume';
+            micStatus.classList.remove('live');
+          }
+        });
+      }
+
+      // ---------- Debug panel ----------
+      debugToggle.addEventListener('click', () => {
+        const open = debugPanel.classList.toggle('open');
+        debugToggle.textContent = open ? 'Hide match details' : 'Show match details';
+      });
+      thresholdSlider.addEventListener('input', () => {
+        state.matchThreshold = parseFloat(thresholdSlider.value);
+        thresholdValue.textContent = 'Match sensitivity: ' + state.matchThreshold.toFixed(2);
+      });
+
+    })();
+  </script>
+</body>
+
+</html>
